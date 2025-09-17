@@ -1,0 +1,26 @@
+
+services:
+  telegram-bot:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - TELEGRAM_BOT_NAME=${TELEGRAM_BOT_NAME}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - LIBRETRANSLATE_URL=http://libretranslate:5000/translate
+    depends_on:
+      - libretranslate
+    networks:
+      - bot-net
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - LT_LOAD_ONLY=en,ru
+    networks:
+      - bot-net
+networks:
+  bot-net:
+    driver: bridge

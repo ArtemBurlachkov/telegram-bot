@@ -50,11 +50,11 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build and run Docker Compose
-        run: docker-compose up --build -d
+        run: docker compose up --build -d
 
       - name: Check running containers
         run: |
-          sleep 30 # Даем время контейнерам запуститься
+          sleep 60 
           docker ps -a
-          docker-compose logs telegram-bot
-          docker-compose logs libretranslate
+          docker compose logs telegram-bot
+          docker compose logs libretranslate

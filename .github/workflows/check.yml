@@ -57,8 +57,9 @@ jobs:
         with:
           name: app-artifact
           path: target
-            - name: List files in workspace
-              run: ls -R
+
+      - name: List files in workspace
+        run: ls -R
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2

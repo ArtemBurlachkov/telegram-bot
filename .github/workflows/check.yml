@@ -1,0 +1,60 @@
+name: Build, Test and Analyze
+
+on:
+  push:
+    branches: [ "master", "CI" ] # Запускать при push в master или CI
+  pull_request:
+    branches: [ "master" ] # Запускать при pull request в master
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # Использовать последнюю версию Ubuntu
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 18
+        uses: actions/setup-java@v3
+        with:
+          java-version: '18'
+          distribution: 'temurin'
+
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+
+  qodana:
+    needs: build-and-test # Запускать после успешной сборки
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Qodana Scan
+        uses: JetBrains/qodana-action@v2023.2
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }} # Токен для отправки результатов в Qodana Cloud
+
+  docker-build-and-run:
+    needs: build-and-test # Запускать после успешной сборки
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and run Docker Compose
+        run: docker-compose up --build -d
+
+      - name: Check running containers
+        run: |
+          sleep 30 # Даем время контейнерам запуститься
+          docker ps -a
+          docker-compose logs telegram-bot
+          docker-compose logs libretranslate

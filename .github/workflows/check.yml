@@ -5,6 +5,7 @@ on:
     branches: [ "master", "CI" ] # Запускать при push в master или CI
   pull_request:
     branches: [ "master" ] # Запускать при pull request в master
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -32,8 +33,15 @@ jobs:
   qodana:
     needs: build-and-test # Запускать после успешной сборки
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -42,7 +50,9 @@ jobs:
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2023.2
         env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }} # Токен для отправки результатов в Qodana Cloud
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+          QODANA_ENDPOINT: 'https://qodana.cloud'
+
 
   docker-build-and-run:
     needs: build-and-test # Запускать после успешной сборки

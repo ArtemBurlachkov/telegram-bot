@@ -32,15 +32,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             "и я найду коктейли, в которых он есть.\n\n" +
             "Ты также можешь искать по нескольким ингредиентам, перечислив их через запятую (например, 'ром, мята, лайм').";
 
-    public TelegramBot(BotConfig botConfig, CocktailDBService cocktailDBService, TranslationService translationService) {
-        super(botConfig.getBotToken());
+    public TelegramBot(BotConfig botConfig, CocktailDBService cocktailDBService) {
+        super(botConfig.getToken());
         this.botConfig = botConfig;
         this.cocktailDBService = cocktailDBService;
     }
 
     @Override
     public String getBotUsername() {
-        return botConfig.getBotName();
+        return botConfig.getName();
     }
 
     @Override
@@ -130,7 +130,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
+            log.error("Error occurred: {}", e.getMessage());
         }
     }
 }

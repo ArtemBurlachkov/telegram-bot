@@ -12,6 +12,7 @@ import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     Integer.parseInt(messageText);
                     handleNumberSelection(chatId, messageText);
                 } catch (NumberFormatException e) {
+                    // Этот обработчик теперь единственный для поиска
                     handleIngredientSearch(chatId, messageText);
                 }
             }
@@ -63,8 +65,19 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleIngredientSearch(long chatId, String messageText) {
-        List<String> ingredients = Arrays.asList(messageText.split(",\\s*"));
-        List<Cocktail> cocktails = cocktailDBService.findByMultipleIngredients(ingredients);
+        List<String> ingredients = Arrays.stream(messageText.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+
+        List<Cocktail> cocktails;
+        if (ingredients.size() > 1) {
+            // Метод findByMultipleIngredients должен возвращать List<Cocktail>, а не List<CocktailDetails>
+            // Мы исправим это в CocktailDBService
+            cocktails = cocktailDBService.findByMultipleIngredients(ingredients);
+        } else {
+            cocktails = cocktailDBService.findByIngredient(ingredients.get(0));
+        }
 
         if (cocktails.isEmpty()) {
             sendMessage(chatId, "К сожалению, по вашему запросу ничего не найдено. Попробуйте другие ингредиенты.");
@@ -106,16 +119,23 @@ public class TelegramBot extends TelegramLongPollingBot {
                     "Ингредиенты:\n" + String.join("\n", details.getIngredients()) + "\n\n" +
                     "Инструкция:\n" + details.getInstructions();
 
-            SendPhoto sendPhoto = new SendPhoto();
-            sendPhoto.setChatId(String.valueOf(chatId));
-            sendPhoto.setPhoto(new InputFile(details.getImageUrl()));
-            sendPhoto.setCaption(recipe);
+            // Проверяем, есть ли у нас изображение для отправки
+            if (details.getImage() != null && details.getImage().length > 0) {
+                SendPhoto sendPhoto = new SendPhoto();
+                sendPhoto.setChatId(String.valueOf(chatId));
+                // Оборачиваем массив байт в InputFile
+                sendPhoto.setPhoto(new InputFile(new ByteArrayInputStream(details.getImage()), "photo.jpg"));
+                sendPhoto.setCaption(recipe);
 
-            try {
-                execute(sendPhoto);
-            } catch (TelegramApiException e) {
-                log.error("Failed to send photo for cocktail ID {}: {}", details.getId(), e.getMessage());
-                // Если отправка фото не удалась, отправляем только текст
+                try {
+                    execute(sendPhoto);
+                } catch (TelegramApiException e) {
+                    log.error("Failed to send photo for cocktail ID {}: {}", details.getId(), e.getMessage());
+                    // Если отправка фото не удалась, отправляем только текст
+                    sendMessage(chatId, recipe);
+                }
+            } else {
+                // Если изображения нет, отправляем только текст
                 sendMessage(chatId, recipe);
             }
         } else {

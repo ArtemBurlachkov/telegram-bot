@@ -21,6 +21,19 @@ services:
       - LT_LOAD_ONLY=en,ru
     networks:
       - bot-net
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - bot-net
+
 networks:
   bot-net:
     driver: bridge
+
+volumes:
+  mongo-data:

@@ -18,9 +18,9 @@ public class CocktailCache {
     @Id
     private String id;
 
-    private String requestKey; // The search term (e.g., ingredient) or cocktail ID
+    private String requestKey;
 
-    private String responseJson; // The JSON response from the external API or serialized DTO
+    private String responseJson;
 
     private CacheType type;
 
@@ -29,5 +29,4 @@ public class CocktailCache {
         this.responseJson = responseJson;
         this.type = type;
     }
-
 }

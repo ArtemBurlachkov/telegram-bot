@@ -97,3 +97,32 @@
 4.  Выполнить команду в консоли docker-compose up или запустить docker-compose через IDE
 5.  Дождаться билда приложения (3-4 минуты в зависимости от скорости интернета) и запуска всех контейнеров
 6. Запустите приложение и свой Telegram-бот.
+
+### Файловая структура
+## Структура проекта
+
+```text
+io.prj3ct.telegramdemobot
++-- TelegramBotApplication.java     // Главный класс приложения Spring Boot
++-- config                          // Пакет с конфигурационными классами
+|   +-- AppConfig.java              // Общая конфигурация приложения (бины, RestTemplate)
+|   +-- BotConfig.java              // Конфигурация для Telegram-бота (токен, имя)
+|   +-- BotInitializer.java         // Инициализация и регистрация бота
+|   +-- TranslationConfig.java      // Конфигурация для сервиса перевода
++-- dto                             // Data Transfer Objects (Объекты для передачи данных)
+|   +-- Cocktail.java               // DTO для общего списка коктейлей
+|   +-- CocktailDetails.java        // DTO для детальной информации о коктейле
++-- model                           // Модели данных (сущности для БД)
+|   +-- CocktailCache.java          // Сущность для кеширования коктейлей в базе данных
++-- repository                      // Репозитории для работы с базой данных
+|   +-- CocktailCacheRepository.java// Репозиторий для доступа к кешу коктейлей
++-- service                         // Сервисный слой с бизнес-логикой
+    +-- CocktailApiClient.java      // Интерфейс для клиента API TheCocktailDB
+    +-- CocktailApiDataParser.java  // Парсер для обработки JSON-ответов от API
+    +-- CocktailDBService.java      // Основной сервис, управляющий логикой поиска и перевода коктейлей
+    +-- CocktailDbClient.java       // Реализация клиента для TheCocktailDB API
+    +-- ImageService.java           // Сервис для загрузки изображений
+    +-- TelegramBot.java            // Основной класс, отвечающий за логику работы Telegram-бота
+    +-- TranslationService.java     // Сервис для перевода текста через LibreTranslate API
+    +-- command                     // Пакет для реализации команд бота (/start и т.д.)
+```

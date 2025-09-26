@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class CocktailDetails extends Cocktail {
-    private String imageUrl;
+    private byte[] image;
     private String instructions;
     private List<String> ingredients;
 }

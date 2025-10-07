@@ -29,5 +29,11 @@ public class CocktailDbClient implements CocktailApiClient {
                 .queryParam("i", id);
         return restTemplate.getForObject(builder.toUriString(), String.class);
     }
+    @Override
+    public String listIngredients() {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(apiBaseUrl + "list.php")
+                .queryParam("i", "list");
+        return restTemplate.getForObject(builder.toUriString(), String.class);
+    }
 
 }

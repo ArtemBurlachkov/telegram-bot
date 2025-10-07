@@ -10,10 +10,12 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.ByteArrayInputStream;
@@ -47,6 +49,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<BotCommand> commands = new ArrayList<>();
         commands.add(new BotCommand("/start", "начать работу с ботом"));
         commands.add(new BotCommand("/search", "поиск коктейля по названию"));
+        commands.add(new BotCommand("/ingredients","список доступных ингридиентов"));
         try{
             this.execute(new SetMyCommands(commands, new BotCommandScopeDefault(),null));
         } catch (TelegramApiException e) {
@@ -84,6 +87,30 @@ public class TelegramBot extends TelegramLongPollingBot {
             execute(message);
         } catch (TelegramApiException e) {
             log.error("Error occurred: {}", e.getMessage());
+        }
+    }
+    public void sendMessage(long chatId, String text, InlineKeyboardMarkup keyboard) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(text);
+        message.setReplyMarkup(keyboard);
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error sending message with keyboard: {}", e.getMessage());
+        }
+    }
+
+    public void editMessage(long chatId, int messageId, String text, InlineKeyboardMarkup keyboard) {
+        EditMessageText editMessage = new EditMessageText();
+        editMessage.setChatId(String.valueOf(chatId));
+        editMessage.setMessageId(messageId);
+        editMessage.setText(text);
+        editMessage.setReplyMarkup(keyboard);
+        try {
+            execute(editMessage);
+        } catch (TelegramApiException e) {
+            log.error("Error editing message: {}", e.getMessage());
         }
     }
 }

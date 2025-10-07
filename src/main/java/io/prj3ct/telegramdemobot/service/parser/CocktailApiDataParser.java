@@ -103,4 +103,22 @@ public class CocktailApiDataParser {
 
         return details;
     }
+    public List<String> parseIngredientsList(String jsonResponse) {
+        if (jsonResponse == null) {
+            return Collections.emptyList();
+        }
+
+        JSONObject jsonObject = new JSONObject(jsonResponse);
+        JSONArray drinks = jsonObject.getJSONArray("drinks");
+        if (drinks.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> ingredients = new ArrayList<>();
+        for (int i = 0; i < drinks.length(); i++) {
+            JSONObject ingredientJson = drinks.getJSONObject(i);
+            ingredients.add(ingredientJson.getString("strIngredient1"));
+        }
+        return ingredients;
+    }
 }

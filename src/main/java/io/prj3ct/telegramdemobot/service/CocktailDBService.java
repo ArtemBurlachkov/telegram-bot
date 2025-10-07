@@ -21,22 +21,24 @@ import java.util.stream.Collectors;
 @Service
 public class CocktailDBService {
 
+    private static final String INGREDIENTS_CACHE_KEY = "ingredients_list_ru";
+
     private final TranslationService translationService;
     private final CocktailCacheRepository cocktailCacheRepository;
     private final ObjectMapper objectMapper;
     private final CocktailApiClient cocktailApiClient;
-    private final CocktailApiDataParser dataParser;
+    private final CocktailApiDataParser cocktailApiDataParser;
 
     public CocktailDBService(TranslationService translationService,
                              CocktailCacheRepository cocktailCacheRepository,
                              ObjectMapper objectMapper,
                              CocktailApiClient cocktailApiClient,
-                             CocktailApiDataParser dataParser) {
+                             CocktailApiDataParser cocktailApiDataParser) {
         this.translationService = translationService;
         this.cocktailCacheRepository = cocktailCacheRepository;
         this.objectMapper = objectMapper;
         this.cocktailApiClient = cocktailApiClient;
-        this.dataParser = dataParser;
+        this.cocktailApiDataParser = cocktailApiDataParser;
     }
 
     private boolean isCyrillic(String text) {
@@ -70,7 +72,7 @@ public class CocktailDBService {
 
         String apiResponse = cocktailApiClient.findByIngredient(translatedIngredientForApi.toLowerCase().trim());
 
-        List<Cocktail> cocktails = dataParser.parseCocktailList(apiResponse, queryIsCyrillic, translatedIngredientForApi);
+        List<Cocktail> cocktails = cocktailApiDataParser.parseCocktailList(apiResponse, queryIsCyrillic, translatedIngredientForApi);
 
         if (!cocktails.isEmpty()) {
             try {
@@ -122,7 +124,7 @@ public class CocktailDBService {
 
         log.info("No details in cache for cocktail ID: {}. Requesting from API.", id);
         String response = cocktailApiClient.findById(id);
-        CocktailDetails details = dataParser.parseCocktailDetails(response);
+        CocktailDetails details = cocktailApiDataParser.parseCocktailDetails(response);
 
         if (details != null) {
             try {
@@ -136,4 +138,41 @@ public class CocktailDBService {
 
         return details;
     }
+
+    public List<String> getIngredientsList() {
+        String response = cocktailApiClient.listIngredients();
+        return cocktailApiDataParser.parseIngredientsList(response);
+    }
+
+
+
+    public List<String> getTranslatedIngredients() {
+        Optional<CocktailCache> cachedIngredients = cocktailCacheRepository.findByRequestKeyAndType(INGREDIENTS_CACHE_KEY, CocktailCache.CacheType.INGREDIENTS_LIST);
+
+        if (cachedIngredients.isPresent()) {
+            log.info("Found translated ingredients list in cache.");
+            try {
+                return objectMapper.readValue(cachedIngredients.get().getResponseJson(), new TypeReference<List<String>>() {});
+            } catch (JsonProcessingException e) {
+                log.error("Failed to deserialize cached ingredients list. Refetching.", e);
+            }
+        }
+
+        log.info("No translated ingredients list in cache. Fetching and translating.");
+        List<String> ingredients = getIngredientsList();
+        List<String> translatedIngredients = ingredients.stream()
+                .map(ingredient -> translationService.translate(ingredient, "en", "ru"))
+                .collect(Collectors.toList());
+
+        try {
+            String ingredientsJson = objectMapper.writeValueAsString(translatedIngredients);
+            cocktailCacheRepository.save(new CocktailCache(INGREDIENTS_CACHE_KEY, ingredientsJson, CocktailCache.CacheType.INGREDIENTS_LIST));
+            log.info("Saved translated ingredients list to cache.");
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize ingredients list for caching.", e);
+        }
+
+        return translatedIngredients;
+    }
+
 }

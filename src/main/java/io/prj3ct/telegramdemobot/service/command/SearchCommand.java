@@ -21,10 +21,10 @@ public record SearchCommand(TelegramBot telegramBot, CocktailDBService cocktailD
         long chatId = update.getMessage().getChatId();
         String messageText = update.getMessage().getText().trim();
 
-        String query = null;
-        if (messageText.equalsIgnoreCase("/search")) {
-            telegramBot.sendMessage(chatId, SEARCH_MESSAGE);
-        }else {
+        String query;
+        if (messageText.toLowerCase().startsWith("/search")) {
+            query = messageText.substring("/search".length()).trim();
+        } else {
             query = messageText;
         }
 

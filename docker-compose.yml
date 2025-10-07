@@ -1,20 +1,26 @@
 
 services:
   telegram-bot:
-    build: .
+    image: ${{secrets.DOCKER_USERNAME}}/telegram-bot:latest
+    container_name: telegram-bot-app
+    restart: always
     ports:
       - "8080:8080"
     environment:
       - TELEGRAM_BOT_NAME=${TELEGRAM_BOT_NAME}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - LIBRETRANSLATE_URL=http://libretranslate:5000/translate
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/cocktail_cache
     depends_on:
       - libretranslate
+      - mongo
     networks:
       - bot-net
 
   libretranslate:
     image: libretranslate/libretranslate:latest
+    container_name: libretranslate-app
+    restart: always
     ports:
       - "5000:5000"
     environment:
@@ -24,10 +30,22 @@ services:
 
   mongo:
     image: mongo:latest
+    container_name: mongo-db
+    restart: always
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    networks:
+      - bot-net
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 60 telegram-bot-app
     networks:
       - bot-net
 

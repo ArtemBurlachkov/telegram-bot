@@ -12,7 +12,8 @@ public class CocktailCache {
 
     public enum CacheType {
         INGREDIENT_SEARCH,
-        COCKTAIL_DETAILS
+        COCKTAIL_DETAILS,
+        INGREDIENTS_LIST
     }
 
     @Id

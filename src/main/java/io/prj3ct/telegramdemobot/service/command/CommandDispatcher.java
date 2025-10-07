@@ -19,11 +19,13 @@ public class CommandDispatcher {
 
     public CommandDispatcher(TelegramBot telegramBot, CocktailDBService cocktailDBService, UserSessionService userSessionService) {
         this.commandMap = new HashMap<>();
-        this.commandMap.put("/start", new StartCommand(telegramBot));
 
         this.searchCommand = new SearchCommand(telegramBot, cocktailDBService, userSessionService);
-        this.selectCommand = new SelectCommand(telegramBot, cocktailDBService, userSessionService);
+        this.selectCommand = new ProcessSelectionCommand(telegramBot, cocktailDBService, userSessionService);
         this.unknownCommand = new UnknownCommand(telegramBot);
+
+        this.commandMap.put("/start", new StartCommand(telegramBot));
+        this.commandMap.put("/search", searchCommand);
     }
 
     public void dispatch(Update update) {

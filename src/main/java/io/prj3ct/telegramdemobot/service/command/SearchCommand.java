@@ -11,22 +11,27 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class SearchCommand implements Command {
+public record SearchCommand(TelegramBot telegramBot, CocktailDBService cocktailDBService,
+                            UserSessionService userSessionService) implements Command {
 
-    private final TelegramBot telegramBot;
-    private final CocktailDBService cocktailDBService;
-    private final UserSessionService userSessionService;
-
-    public SearchCommand(TelegramBot telegramBot, CocktailDBService cocktailDBService, UserSessionService userSessionService) {
-        this.telegramBot = telegramBot;
-        this.cocktailDBService = cocktailDBService;
-        this.userSessionService = userSessionService;
-    }
+    public static final String SEARCH_MESSAGE = "Введите название ингредиента (например, 'водка') или несколько через запятую (например, 'ром, мята').";
 
     @Override
     public void execute(Update update) {
         long chatId = update.getMessage().getChatId();
-        String messageText = update.getMessage().getText();
+        String messageText = update.getMessage().getText().trim();
+
+        String query = null;
+        if (messageText.equalsIgnoreCase("/search")) {
+            telegramBot.sendMessage(chatId, SEARCH_MESSAGE);
+        }else {
+            query = messageText;
+        }
+
+        if (query.isEmpty()) {
+            telegramBot.sendMessage(chatId, SEARCH_MESSAGE);
+            return;
+        }
 
         List<String> ingredients = Arrays.stream(messageText.split(","))
                 .map(String::trim)

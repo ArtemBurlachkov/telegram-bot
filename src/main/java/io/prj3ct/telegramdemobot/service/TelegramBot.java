@@ -7,13 +7,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -26,6 +31,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         super(botConfig.getToken());
         this.botConfig = botConfig;
         this.commandDispatcher = commandDispatcher;
+        setBotCommands();
     }
 
     @Override
@@ -36,6 +42,16 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         commandDispatcher.dispatch(update);
+    }
+    private void setBotCommands() {
+        List<BotCommand> commands = new ArrayList<>();
+        commands.add(new BotCommand("/start", "начать работу с ботом"));
+        commands.add(new BotCommand("/search", "поиск коктейля по названию"));
+        try{
+            this.execute(new SetMyCommands(commands, new BotCommandScopeDefault(),null));
+        } catch (TelegramApiException e) {
+            log.error("Error setting bot's command list: {}", e.getMessage());
+        }
     }
 
     public void sendCocktailDetails(long chatId, CocktailDetails details) {

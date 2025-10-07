@@ -9,17 +9,8 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 
 import java.util.List;
 
-public class SelectCommand implements Command {
-
-    private final TelegramBot telegramBot;
-    private final CocktailDBService cocktailDBService;
-    private final UserSessionService userSessionService;
-
-    public SelectCommand(TelegramBot telegramBot, CocktailDBService cocktailDBService, UserSessionService userSessionService) {
-        this.telegramBot = telegramBot;
-        this.cocktailDBService = cocktailDBService;
-        this.userSessionService = userSessionService;
-    }
+public record ProcessSelectionCommand(TelegramBot telegramBot, CocktailDBService cocktailDBService,
+                                      UserSessionService userSessionService) implements Command {
 
     @Override
     public void execute(Update update) {

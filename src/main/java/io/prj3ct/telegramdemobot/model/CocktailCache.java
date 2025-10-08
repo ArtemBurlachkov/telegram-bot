@@ -25,9 +25,12 @@ public class CocktailCache {
 
     private CacheType type;
 
-    public CocktailCache(String requestKey, String responseJson, CacheType type) {
+    private boolean translated;
+
+    public CocktailCache(String requestKey, String responseJson, CacheType type, boolean translated) {
         this.requestKey = requestKey;
         this.responseJson = responseJson;
         this.type = type;
+        this.translated = translated;
     }
 }

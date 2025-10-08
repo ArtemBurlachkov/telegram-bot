@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @Service
 public class CocktailDBService {
 
-    private static final String INGREDIENTS_CACHE_KEY = "ingredients_list_ru";
+    private static final String INGREDIENTS_CACHE_KEY = "ingredients_list";
 
     private final TranslationService translationService;
     private final CocktailCacheRepository cocktailCacheRepository;
@@ -52,36 +52,50 @@ public class CocktailDBService {
         Optional<CocktailCache> cachedResponse = cocktailCacheRepository.findByRequestKeyAndType(cacheKey, CocktailCache.CacheType.INGREDIENT_SEARCH);
 
         if (cachedResponse.isPresent()) {
-            log.info("Found translated response in cache for key: {}", cacheKey);
-            String cachedJson = cachedResponse.get().getResponseJson();
+            CocktailCache cache = cachedResponse.get();
+            log.info("Found response in cache for key: '{}'. Translated: {}", cacheKey, cache.isTranslated());
             try {
-                return objectMapper.readValue(cachedJson, new TypeReference<List<Cocktail>>() {});
+                List<Cocktail> cocktails = objectMapper.readValue(cache.getResponseJson(), new TypeReference<List<Cocktail>>() {});
+                if (!cache.isTranslated() && queryIsCyrillic) {
+                    log.info("Cache entry for '{}' is not translated. Attempting to translate now.", cacheKey);
+                    try {
+                        cocktails.forEach(cocktail -> cocktail.setName(translationService.translate(cocktail.getName(), "en", "ru")));
+                        boolean isTranslated = !cocktails.isEmpty() && isCyrillic(cocktails.get(0).getName());
+                        cacheAndLog(cacheKey, cocktails, CocktailCache.CacheType.INGREDIENT_SEARCH, isTranslated);
+                        if (isTranslated) {
+                            log.info("Successfully translated and updated cache for key: '{}'", cacheKey);
+                        } else {
+                            log.warn("Failed to translate from cache for key: '{}', translator might be down. Caching as untranslated.", cacheKey);
+                        }
+                        return cocktails;
+                    } catch (Exception e) {
+                        log.error("Failed to translate from cache for key: '{}'. Returning untranslated data.", cacheKey, e);
+                    }
+                }
+                return cocktails;
             } catch (JsonProcessingException e) {
                 log.error("Failed to deserialize cached cocktails for key: {}. Refetching.", cacheKey, e);
             }
         }
 
         log.info("No cache entry for key: '{}'. Requesting from API.", cacheKey);
-        String translatedIngredientForApi;
-        if (queryIsCyrillic) {
-            translatedIngredientForApi = translationService.translate(ingredient, "ru", "en");
-            log.info("Translated ingredient '{}' to '{}'", ingredient, translatedIngredientForApi);
-        } else {
-            translatedIngredientForApi = ingredient;
-        }
+        String translatedIngredientForApi = queryIsCyrillic ? translationService.translate(ingredient, "ru", "en") : ingredient;
+        if (queryIsCyrillic) log.info("Translated ingredient '{}' to '{}'", ingredient, translatedIngredientForApi);
 
         String apiResponse = cocktailApiClient.findByIngredient(translatedIngredientForApi.toLowerCase().trim());
+        List<Cocktail> cocktails = cocktailApiDataParser.parseCocktailList(apiResponse, translatedIngredientForApi);
 
-        List<Cocktail> cocktails = cocktailApiDataParser.parseCocktailList(apiResponse, queryIsCyrillic, translatedIngredientForApi);
-
-        if (!cocktails.isEmpty()) {
+        if (queryIsCyrillic) {
             try {
-                String translatedJson = objectMapper.writeValueAsString(cocktails);
-                cocktailCacheRepository.save(new CocktailCache(cacheKey, translatedJson, CocktailCache.CacheType.INGREDIENT_SEARCH));
-                log.info("Saved translated cocktails to cache for key: {}", cacheKey);
-            } catch (JsonProcessingException e) {
-                log.error("Failed to serialize translated cocktails for caching. Key: {}", cacheKey, e);
+                cocktails.forEach(cocktail -> cocktail.setName(translationService.translate(cocktail.getName(), "en", "ru")));
+                boolean isTranslated = !cocktails.isEmpty() && isCyrillic(cocktails.get(0).getName());
+                cacheAndLog(cacheKey, cocktails, CocktailCache.CacheType.INGREDIENT_SEARCH, isTranslated);
+            } catch (Exception e) {
+                log.error("Failed to translate new data for key: '{}'. Caching untranslated data.", cacheKey, e);
+                cacheAndLog(cacheKey, cocktails, CocktailCache.CacheType.INGREDIENT_SEARCH, false);
             }
+        } else {
+            cacheAndLog(cacheKey, cocktails, CocktailCache.CacheType.INGREDIENT_SEARCH, false);
         }
 
         return cocktails;
@@ -114,11 +128,29 @@ public class CocktailDBService {
         Optional<CocktailCache> cachedDetails = cocktailCacheRepository.findByRequestKeyAndType(id, CocktailCache.CacheType.COCKTAIL_DETAILS);
 
         if (cachedDetails.isPresent()) {
-            log.info("Found details in cache for cocktail ID: {}", id);
+            CocktailCache cache = cachedDetails.get();
+            log.info("Found details in cache for cocktail ID: {}. Translated: {}", id, cache.isTranslated());
             try {
-                return objectMapper.readValue(cachedDetails.get().getResponseJson(), CocktailDetails.class);
+                CocktailDetails details = objectMapper.readValue(cache.getResponseJson(), CocktailDetails.class);
+                if (!cache.isTranslated()) {
+                    log.info("Details for ID '{}' are not translated. Attempting to translate now.", id);
+                    try {
+                        translateCocktailDetails(details);
+                        boolean isTranslated = isCyrillic(details.getName());
+                        cacheAndLog(id, details, CocktailCache.CacheType.COCKTAIL_DETAILS, isTranslated);
+                        if (isTranslated) {
+                            log.info("Successfully translated and updated cache for ID: '{}'", id);
+                        } else {
+                            log.warn("Failed to translate from cache for ID: '{}', translator might be down. Caching as untranslated.", id);
+                        }
+                        return details;
+                    } catch (Exception e) {
+                        log.error("Failed to translate details from cache for ID: '{}'. Returning untranslated data.", id, e);
+                    }
+                }
+                return details;
             } catch (JsonProcessingException e) {
-                log.error("Failed to deserialize cached cocktail details for ID: {}", id, e);
+                log.error("Failed to deserialize cached cocktail details for ID: {}. Refetching.", id, e);
             }
         }
 
@@ -128,11 +160,12 @@ public class CocktailDBService {
 
         if (details != null) {
             try {
-                String detailsJson = objectMapper.writeValueAsString(details);
-                cocktailCacheRepository.save(new CocktailCache(id, detailsJson, CocktailCache.CacheType.COCKTAIL_DETAILS));
-                log.info("Saved translated details to cache for cocktail ID: {}", id);
-            } catch (JsonProcessingException e) {
-                log.error("Failed to serialize cocktail details for caching. ID: {}", id, e);
+                translateCocktailDetails(details);
+                boolean isTranslated = isCyrillic(details.getName());
+                cacheAndLog(id, details, CocktailCache.CacheType.COCKTAIL_DETAILS, isTranslated);
+            } catch (Exception e) {
+                log.error("Failed to translate new details for ID: '{}'. Caching untranslated data.", id, e);
+                cacheAndLog(id, details, CocktailCache.CacheType.COCKTAIL_DETAILS, false);
             }
         }
 
@@ -144,35 +177,88 @@ public class CocktailDBService {
         return cocktailApiDataParser.parseIngredientsList(response);
     }
 
-
-
     public List<String> getTranslatedIngredients() {
         Optional<CocktailCache> cachedIngredients = cocktailCacheRepository.findByRequestKeyAndType(INGREDIENTS_CACHE_KEY, CocktailCache.CacheType.INGREDIENTS_LIST);
 
         if (cachedIngredients.isPresent()) {
-            log.info("Found translated ingredients list in cache.");
+            CocktailCache cache = cachedIngredients.get();
+            log.info("Found ingredients list in cache. Translated: {}", cache.isTranslated());
             try {
-                return objectMapper.readValue(cachedIngredients.get().getResponseJson(), new TypeReference<List<String>>() {});
+                List<String> ingredients = objectMapper.readValue(cache.getResponseJson(), new TypeReference<List<String>>() {});
+                if (!cache.isTranslated()) {
+                    log.info("Ingredients list is not translated. Attempting to translate now.");
+                    try {
+                        List<String> translatedIngredients = ingredients.stream()
+                                .map(ing -> translationService.translate(ing, "en", "ru"))
+                                .collect(Collectors.toList());
+                        boolean isTranslated = !translatedIngredients.isEmpty() && isCyrillic(translatedIngredients.get(0));
+                        cacheAndLog(INGREDIENTS_CACHE_KEY, translatedIngredients, CocktailCache.CacheType.INGREDIENTS_LIST, isTranslated);
+                        if (isTranslated) {
+                            log.info("Successfully translated and updated ingredients cache.");
+                        } else {
+                            log.warn("Failed to translate ingredients from cache, translator might be down. Caching as untranslated.");
+                        }
+                        return translatedIngredients;
+                    } catch (Exception e) {
+                        log.error("Failed to translate ingredients from cache. Returning untranslated.", e);
+                    }
+                }
+                return ingredients;
             } catch (JsonProcessingException e) {
                 log.error("Failed to deserialize cached ingredients list. Refetching.", e);
             }
         }
 
-        log.info("No translated ingredients list in cache. Fetching and translating.");
+        log.info("No ingredients list in cache. Fetching and translating.");
         List<String> ingredients = getIngredientsList();
-        List<String> translatedIngredients = ingredients.stream()
-                .map(ingredient -> translationService.translate(ingredient, "en", "ru"))
-                .collect(Collectors.toList());
-
         try {
-            String ingredientsJson = objectMapper.writeValueAsString(translatedIngredients);
-            cocktailCacheRepository.save(new CocktailCache(INGREDIENTS_CACHE_KEY, ingredientsJson, CocktailCache.CacheType.INGREDIENTS_LIST));
-            log.info("Saved translated ingredients list to cache.");
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize ingredients list for caching.", e);
+            List<String> translatedIngredients = ingredients.stream()
+                    .map(ing -> translationService.translate(ing, "en", "ru"))
+                    .collect(Collectors.toList());
+            boolean isTranslated = !translatedIngredients.isEmpty() && isCyrillic(translatedIngredients.get(0));
+            cacheAndLog(INGREDIENTS_CACHE_KEY, translatedIngredients, CocktailCache.CacheType.INGREDIENTS_LIST, isTranslated);
+            return translatedIngredients;
+        } catch (Exception e) {
+            log.error("Failed to translate new ingredients list. Caching untranslated.", e);
+            cacheAndLog(INGREDIENTS_CACHE_KEY, ingredients, CocktailCache.CacheType.INGREDIENTS_LIST, false);
+            return ingredients;
         }
-
-        return translatedIngredients;
     }
 
+    private void translateCocktailDetails(CocktailDetails details) {
+        details.setName(translationService.translate(details.getName(), "en", "ru"));
+        details.setInstructions(translationService.translate(details.getInstructions(), "en", "ru"));
+        List<String> translatedIngredients = details.getIngredients().stream()
+                .map(ing -> {
+                    String[] parts = ing.split(" - ", 2);
+                    String translatedIngredient = translationService.translate(parts[0], "en", "ru");
+                    return parts.length > 1 ? translatedIngredient + " - " + parts[1] : translatedIngredient;
+                })
+                .collect(Collectors.toList());
+        details.setIngredients(translatedIngredients);
+    }
+
+    private void cacheAndLog(String key, Object data, CocktailCache.CacheType type, boolean translated) {
+        try {
+            String json = objectMapper.writeValueAsString(data);
+
+            Optional<CocktailCache> existingCacheOpt = cocktailCacheRepository.findByRequestKeyAndType(key, type);
+
+            CocktailCache cacheToSave;
+            if (existingCacheOpt.isPresent()) {
+                cacheToSave = existingCacheOpt.get();
+                cacheToSave.setResponseJson(json);
+                cacheToSave.setTranslated(translated);
+                log.info("Updating cache for key: '{}'. Translated: {}", key, translated);
+            } else {
+                cacheToSave = new CocktailCache(key, json, type, translated);
+                log.info("Saving new cache for key: '{}'. Translated: {}", key, translated);
+            }
+
+            cocktailCacheRepository.save(cacheToSave);
+
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize for caching. Key: '{}'", key, e);
+        }
+    }
 }

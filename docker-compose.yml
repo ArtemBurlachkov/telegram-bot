@@ -1,7 +1,7 @@
 
 services:
   telegram-bot:
-    image: ${{secrets.DOCKER_USERNAME}}/telegram-bot:latest
+    image: ${DOCKER_USERNAME}/telegram-bot:latest
     container_name: telegram-bot-app
     restart: always
     ports:
@@ -10,7 +10,7 @@ services:
       - TELEGRAM_BOT_NAME=${TELEGRAM_BOT_NAME}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - LIBRETRANSLATE_URL=http://libretranslate:5000/translate
-      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/cocktail_cache
+      - SPRING_DATA_MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASS}@mongo:27017/cocktail_cache?authSource=admin
     depends_on:
       - libretranslate
       - mongo
@@ -34,6 +34,9 @@ services:
     restart: always
     ports:
       - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
     volumes:
       - mongo-data:/data/db
     networks:
